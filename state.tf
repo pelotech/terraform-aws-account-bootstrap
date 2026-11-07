@@ -1,7 +1,7 @@
 module "state_bucket" {
   count   = var.state_bucket_name == null ? 0 : 1
   source  = "terraform-aws-modules/s3-bucket/aws"
-  version = "5.15.4"
+  version = "5.17.0"
 
   bucket = var.state_bucket_name
   tags   = var.tags
