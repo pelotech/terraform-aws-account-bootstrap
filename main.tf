@@ -35,7 +35,7 @@ locals {
 
 module "oidc" {
   source  = "pelotech/oidc-github/aws"
-  version = "1.2.0"
+  version = "1.2.1"
 
   roles = merge(local.base_roles, var.additional_roles)
   tags  = var.tags
