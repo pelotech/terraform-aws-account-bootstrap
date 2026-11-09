@@ -39,8 +39,10 @@ resource "aws_iam_role" "management" {
 }
 
 resource "aws_iam_role_policy_attachment" "management" {
-  for_each   = aws_iam_role.management
-  role       = each.value.name
+  # Iterate the locals, not aws_iam_role.management: reading the whole role
+  # object pulls in its deprecated managed_policy_arns and warns on every plan.
+  for_each   = local.management_roles
+  role       = aws_iam_role.management[each.key].name
   policy_arn = local.admin_arn
 }
 
