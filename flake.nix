@@ -1,17 +1,10 @@
 {
   description = "Flake config";
 
-  nixConfig = {
-    # Pre-built Terraform binaries from nixpkgs-terraform; avoids building from source.
-    extra-substituters = "https://nixpkgs-terraform.cachix.org";
-    extra-trusted-public-keys = "nixpkgs-terraform.cachix.org-1:8Sit092rIdAVENA3ZVeH9hzSiqI/jng6JiCrQ1Dmusw=";
-  };
-
   inputs = {
     flake-parts.url = "github:hercules-ci/flake-parts";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     treefmt-nix.url = "github:numtide/treefmt-nix";
-    nixpkgs-terraform.url = "github:stackbuilders/nixpkgs-terraform";
   };
 
   outputs =
@@ -24,24 +17,13 @@
         "aarch64-darwin"
       ];
       perSystem =
-        {
-          pkgs,
-          system,
-          ...
-        }:
+        { pkgs, ... }:
         let
-          # Pin the dev shell to the minimum Terraform version the module supports,
-          # taken from `required_version = ">= X.Y.Z"` in versions.tf.
-          tfVersion = builtins.head (
-            builtins.match ".*required_version[[:space:]]*=[[:space:]]*\">= ([0-9.]+)\".*" (
-              builtins.readFile ./versions.tf
-            )
-          );
-          terraform = inputs.nixpkgs-terraform.packages.${system}."terraform-${tfVersion}";
-
           # Everything pre-commit needs; this is all CI installs.
           lintTools = with pkgs; [
-            terraform
+            # terraform: tenv's proxy installs the version in .terraform-version
+            # (min-required: the floor of required_version in versions.tf)
+            tenv
             prek
             tflint
             hcledit
@@ -50,11 +32,16 @@
             actionlint
             zizmor
           ];
+          env.TENV_AUTO_INSTALL = "true";
         in
         {
-          devShells.ci = pkgs.mkShellNoCC { packages = lintTools; };
+          devShells.ci = pkgs.mkShellNoCC {
+            inherit env;
+            packages = lintTools;
+          };
 
           devShells.default = pkgs.mkShellNoCC {
+            inherit env;
             packages =
               lintTools
               ++ (with pkgs; [
@@ -73,8 +60,9 @@
 
           treefmt = {
             projectRootFile = "flake.nix";
+            # OpenTofu's fmt matches terraform fmt and is in the binary cache (terraform is unfree).
             programs.terraform.enable = true;
-            programs.terraform.package = terraform;
+            programs.terraform.package = pkgs.opentofu;
             programs.nixfmt.enable = true;
           };
         };

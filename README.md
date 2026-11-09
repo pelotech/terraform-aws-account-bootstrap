@@ -129,7 +129,7 @@ If you do want plans to lock, pass a policy through `github.plan_policy_arns` th
 
 ## Tests
 
-The tests run offline with a mocked provider. The nix dev shell pins Terraform to the `required_version` floor.
+The tests run offline with a mocked provider. The nix dev shell runs Terraform through tenv, which installs the `required_version` floor (`.terraform-version` is `min-required`).
 
 ```bash
 terraform init -backend=false
