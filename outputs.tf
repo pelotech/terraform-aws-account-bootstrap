@@ -17,3 +17,8 @@ output "controltower_execution_role_arn" {
   value       = try(aws_iam_role.controltower_execution[0].arn, null)
   description = "ARN of the AWSControlTowerExecution role, or null when none was created."
 }
+
+output "organization_access_role_arn" {
+  value       = try(aws_iam_role.organization_access[0].arn, null)
+  description = "ARN of the OrganizationAccountAccessRole, or null when none was created."
+}

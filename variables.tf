@@ -55,7 +55,24 @@ variable "state_bucket_name" {
 variable "management_account_id" {
   type        = string
   default     = null
-  description = "Organization management account ID trusted by the AWSControlTowerExecution role. Null skips the role (use null for the management account itself)."
+  description = "Organization management account ID trusted by the AWSControlTowerExecution role and, when create_organization_access_role is true, the OrganizationAccountAccessRole. Null skips both roles (use null for the management account itself)."
+}
+
+variable "create_organization_access_role" {
+  type        = bool
+  default     = false
+  description = "Create OrganizationAccountAccessRole, trusting management_account_id. Needed for accounts invited into the organization (Organizations only creates it for accounts it creates). Requires management_account_id."
+}
+
+variable "organization_access_extra_trusted_account_ids" {
+  type        = list(string)
+  default     = []
+  description = "Extra account IDs (e.g. the previous organization's management account) that OrganizationAccountAccessRole also trusts. Transitional: use only while migrating an account transferred from another organization, then set back to []."
+
+  validation {
+    condition     = alltrue([for id in var.organization_access_extra_trusted_account_ids : can(regex("^[0-9]{12}$", id))])
+    error_message = "organization_access_extra_trusted_account_ids must be 12-digit AWS account IDs."
+  }
 }
 
 variable "tags" {

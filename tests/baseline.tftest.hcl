@@ -49,6 +49,11 @@ run "member_account" {
   }
 
   assert {
+    condition     = length(aws_iam_role.organization_access) == 0
+    error_message = "OrganizationAccountAccessRole should be off by default"
+  }
+
+  assert {
     condition     = jsonencode(local.base_roles["gh-apply"].subject_repos) == jsonencode(["repo:my-org/infrastructure:ref:refs/heads/main"])
     error_message = "apply role should trust only the main branch"
   }
@@ -103,4 +108,65 @@ run "sso_admins_can_assume_apply" {
     condition     = jsonencode(local.base_roles["gh-apply"].assume_role_names) == jsonencode(["aws-reserved/sso.amazonaws.com/us-gov-west-1/AWSReservedSSO_AdministratorAccess_abc123"])
     error_message = "SSO admin roles should be trusted by path/name"
   }
+}
+
+run "invited_member_account" {
+  command = plan
+
+  variables {
+    management_account_id           = "111111111111"
+    create_organization_access_role = true
+  }
+
+  assert {
+    condition     = aws_iam_role.organization_access[0].name == "OrganizationAccountAccessRole"
+    error_message = "invited accounts should get OrganizationAccountAccessRole"
+  }
+
+  assert {
+    condition     = aws_iam_role_policy_attachment.organization_access[0].policy_arn == "arn:aws-us-gov:iam::aws:policy/AdministratorAccess"
+    error_message = "organization access role should use the account's partition"
+  }
+
+  assert {
+    condition     = jsonencode(local.organization_access_trusted_arns) == jsonencode(["arn:aws-us-gov:iam::111111111111:root"])
+    error_message = "organization access role should trust only the management account by default"
+  }
+}
+
+run "transferred_account_dual_trust" {
+  command = plan
+
+  variables {
+    management_account_id                         = "111111111111"
+    create_organization_access_role               = true
+    organization_access_extra_trusted_account_ids = ["333333333333"]
+  }
+
+  assert {
+    condition     = jsonencode(local.organization_access_trusted_arns) == jsonencode(["arn:aws-us-gov:iam::111111111111:root", "arn:aws-us-gov:iam::333333333333:root"])
+    error_message = "during a transfer the role should trust the management account and the old one"
+  }
+}
+
+run "extra_trusted_ids_must_be_account_ids" {
+  command = plan
+
+  variables {
+    management_account_id                         = "111111111111"
+    create_organization_access_role               = true
+    organization_access_extra_trusted_account_ids = ["not-an-id"]
+  }
+
+  expect_failures = [var.organization_access_extra_trusted_account_ids]
+}
+
+run "org_access_needs_management_account" {
+  command = plan
+
+  variables {
+    create_organization_access_role = true
+  }
+
+  expect_failures = [aws_iam_role.organization_access]
 }
