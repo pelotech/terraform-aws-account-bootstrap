@@ -1,0 +1,46 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: forbid-submodules
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: [--strict, -c=.yamllint]
+  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
+    rev: v9.18.0
+    hooks:
+      - id: commitlint
+        stages: [commit-msg]
+        additional_dependencies: ["@commitlint/config-conventional"]
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.96.1
+    hooks:
+      - id: terraform_fmt
+      - id: terraform_tflint
+        args:
+          - "--args=--config=__GIT_WORKING_DIR__/.tflint.hcl"
+      - id: terraform_docs
+        args:
+          # Document the version constraint, not whatever a local lock file pinned.
+          - "--args=--lockfile=false"
+  - repo: local
+    hooks:
+      - id: terraform-test
+        name: terraform test
+        language: system
+        entry: bash -c 'terraform init -backend=false -input=false >/dev/null && terraform test'
+        files: \.(tf|tftest\.hcl)$
+        pass_filenames: false
+  - repo: https://github.com/kjanat/actionlint
+    rev: v1.16.1
+    hooks:
+      - id: actionlint
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.30.1
+    hooks:
+      - id: zizmor

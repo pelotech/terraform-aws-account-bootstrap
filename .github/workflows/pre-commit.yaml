@@ -1,0 +1,28 @@
+name: pre-commit
+permissions:
+  contents: read
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra_nix_config: |
+            extra-substituters = https://nixpkgs-terraform.cachix.org
+            extra-trusted-public-keys = nixpkgs-terraform.cachix.org-1:8Sit092rIdAVENA3ZVeH9hzSiqI/jng6JiCrQ1Dmusw=
+      - name: Put nix devshell tools on PATH
+        shell: bash
+        run: nix develop .#ci -c printenv PATH >> "$GITHUB_PATH" # zizmor: ignore[github-env]
+      - name: prek
+        run: prek run --all-files --show-diff-on-failure
