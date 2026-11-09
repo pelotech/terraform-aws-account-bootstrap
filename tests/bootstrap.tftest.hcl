@@ -179,6 +179,37 @@ run "github_repository_must_be_owner_name" {
   expect_failures = [var.github]
 }
 
+run "github_repository_with_ids" {
+  command = plan
+
+  variables {
+    github = {
+      repository     = "my-org@226711865/infrastructure@1419144170"
+      apply_subjects = ["ref:refs/heads/main"]
+      plan_subjects  = ["pull_request"]
+    }
+  }
+
+  assert {
+    condition     = jsonencode(local.ci_roles["ci-plan"].subject_repos) == jsonencode(["repo:my-org@226711865/infrastructure@1419144170:pull_request"])
+    error_message = "repository with owner and repo IDs should be used verbatim in the subject"
+  }
+}
+
+run "github_repository_ids_must_be_numeric" {
+  command = plan
+
+  variables {
+    github = {
+      repository     = "my-org@abc/infrastructure"
+      apply_subjects = ["ref:refs/heads/main"]
+      plan_subjects  = ["pull_request"]
+    }
+  }
+
+  expect_failures = [var.github]
+}
+
 run "github_role_names_must_differ" {
   command = plan
 
