@@ -7,9 +7,9 @@
 # https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_accounts_access.html
 
 locals {
-  # "" when unset, so the role's precondition reports the error, not this template.
+  # compact() drops a null management_account_id; var validation requires it when the role is on.
   organization_access_trusted_arns = [
-    for id in concat([var.management_account_id == null ? "" : var.management_account_id], var.organization_access_extra_trusted_account_ids) :
+    for id in compact(concat([var.management_account_id], var.organization_access_extra_trusted_account_ids)) :
     "arn:${local.partition}:iam::${id}:root"
   ]
 }
@@ -33,10 +33,6 @@ resource "aws_iam_role" "organization_access" {
 
   lifecycle {
     prevent_destroy = true
-    precondition {
-      condition     = var.management_account_id != null
-      error_message = "create_organization_access_role needs management_account_id"
-    }
   }
 }
 

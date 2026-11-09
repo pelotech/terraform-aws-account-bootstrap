@@ -4,7 +4,7 @@
 # https://docs.aws.amazon.com/controltower/latest/userguide/enroll-manually.html
 
 data "aws_iam_policy_document" "controltower_execution_trust" {
-  count = var.management_account_id == null ? 0 : 1
+  count = var.create_controltower_execution_role ? 1 : 0
   statement {
     actions = ["sts:AssumeRole"]
     principals {
@@ -15,14 +15,14 @@ data "aws_iam_policy_document" "controltower_execution_trust" {
 }
 
 resource "aws_iam_role" "controltower_execution" {
-  count              = var.management_account_id == null ? 0 : 1
+  count              = var.create_controltower_execution_role ? 1 : 0
   name               = "AWSControlTowerExecution"
   assume_role_policy = data.aws_iam_policy_document.controltower_execution_trust[0].json
   tags               = var.tags
 }
 
 resource "aws_iam_role_policy_attachment" "controltower_execution" {
-  count      = var.management_account_id == null ? 0 : 1
+  count      = var.create_controltower_execution_role ? 1 : 0
   role       = aws_iam_role.controltower_execution[0].name
   policy_arn = "arn:${local.partition}:iam::aws:policy/AdministratorAccess"
 }
