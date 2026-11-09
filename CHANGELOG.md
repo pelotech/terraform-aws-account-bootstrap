@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/pelotech/terraform-aws-account-bootstrap/compare/v0.1.1...v0.2.0) (2026-11-09)
+
+
+### Features
+
+* accept owner and repo IDs in github.repository ([#11](https://github.com/pelotech/terraform-aws-account-bootstrap/issues/11)) ([a1e7819](https://github.com/pelotech/terraform-aws-account-bootstrap/commit/a1e78192046685f6df3f1391d88a7607f5aced13))
+
 ## [0.1.1](https://github.com/pelotech/terraform-aws-account-bootstrap/compare/v0.1.0...v0.1.1) (2026-11-09)
 
 
