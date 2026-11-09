@@ -12,16 +12,18 @@ assignees: ""
 
 ## Module / provider versions
 
-- Module version: (e.g. `v1.0.0`)
-- Terraform: (output of `terraform version`)
+- Module version: (e.g. `v0.1.0`)
+- Terraform / OpenTofu: (output of `terraform version` or `tofu version`)
 - aws provider: (from `.terraform.lock.hcl`)
 
 ## Relevant configuration
 
+Which parts are enabled: `github` / `state_bucket` / `management_account`
+
 <details><summary>module block</summary>
 
 ```hcl
-# paste the module "aws_oidc_github" { … } block here
+# paste the module "account_bootstrap" { … } block here
 ```
 
 </details>
