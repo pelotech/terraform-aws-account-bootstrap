@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/pelotech/terraform-aws-account-bootstrap/compare/v0.1.0...v0.1.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* avoid deprecated managed_policy_arns warning on management roles ([#9](https://github.com/pelotech/terraform-aws-account-bootstrap/issues/9)) ([b35893f](https://github.com/pelotech/terraform-aws-account-bootstrap/commit/b35893f2135f27958212466208e014d859073d3b))
+
 ## 0.1.0 (2026-11-09)
 
 
