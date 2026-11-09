@@ -11,7 +11,7 @@ variable "github" {
   default     = null
   description = <<-EOT
     GitHub Actions access to this account: an OIDC provider plus an apply role (AdministratorAccess) and a plan role (ReadOnlyAccess). Null creates none of them.
-      - repository: owner/name.
+      - repository: owner/name, as it appears in the OIDC sub claim. If the organization or repository customizes the sub claim to include IDs, use owner@owner_id/name@repo_id.
       - apply_subjects / plan_subjects: OIDC subject claims each role trusts, without the repo:<repository>: prefix, e.g. ["environment:prod"], ["ref:refs/heads/main"], ["pull_request"].
       - apply_role_name / plan_role_name: role names (default ci-apply / ci-plan).
       - plan_policy_arns: extra policy ARNs for the plan role.
@@ -19,8 +19,8 @@ variable "github" {
   EOT
 
   validation {
-    condition     = var.github == null || try(can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github.repository)), false)
-    error_message = "github.repository must be owner/name."
+    condition     = var.github == null || try(can(regex("^[A-Za-z0-9_.-]+(@[0-9]+)?/[A-Za-z0-9_.-]+(@[0-9]+)?$", var.github.repository)), false)
+    error_message = "github.repository must be owner/name or owner@owner_id/name@repo_id."
   }
 
   validation {
