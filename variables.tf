@@ -1,24 +1,28 @@
-variable "github_repository" {
-  type        = string
-  description = "GitHub repository (owner/name) that manages this account's infrastructure. main_branch can assume the apply role, every ref the plan role."
-}
+variable "github" {
+  type = object({
+    repository     = string
+    apply_subjects = list(string)
+    plan_subjects  = list(string)
+  })
+  default     = null
+  description = "GitHub Actions access to this account: an OIDC provider plus the apply and plan roles. repository: owner/name. apply_subjects / plan_subjects: the OIDC subject claims each role trusts, without the repo:<repository>: prefix, e.g. [\"ref:refs/heads/main\"], [\"pull_request\"], [\"environment:prod\"] or [\"*\"]. Null creates no OIDC provider or CI roles."
 
-variable "main_branch" {
-  type        = string
-  default     = "main"
-  description = "Branch of github_repository allowed to assume the apply role."
+  validation {
+    condition     = var.github == null || try(length(var.github.apply_subjects) > 0 && length(var.github.plan_subjects) > 0, false)
+    error_message = "github.apply_subjects and github.plan_subjects must each list at least one subject."
+  }
 }
 
 variable "apply_role_name" {
   type        = string
-  default     = "gh-apply"
-  description = "Name of the admin role CI assumes to apply, from main_branch only."
+  default     = "ci-apply"
+  description = "Name of the admin role CI assumes to apply, trusted for github.apply_subjects."
 }
 
 variable "plan_role_name" {
   type        = string
-  default     = "gh-plan"
-  description = "Name of the read-only role CI assumes to plan, from any ref."
+  default     = "ci-plan"
+  description = "Name of the read-only role CI assumes to plan, trusted for github.plan_subjects."
 }
 
 variable "sso_admin_permission_sets" {
@@ -52,16 +56,43 @@ variable "state_bucket_name" {
   description = "Name of the S3 bucket for this account's OpenTofu state. Null skips the bucket."
 }
 
+variable "state_noncurrent_version_days" {
+  type        = number
+  default     = null
+  description = "Expire noncurrent (old) state object versions after this many days. Null keeps every version."
+
+  validation {
+    condition     = var.state_noncurrent_version_days == null || try(var.state_noncurrent_version_days >= 1, false)
+    error_message = "state_noncurrent_version_days must be at least 1."
+  }
+}
+
 variable "management_account_id" {
   type        = string
   default     = null
-  description = "Organization management account ID trusted by the AWSControlTowerExecution role and, when create_organization_access_role is true, the OrganizationAccountAccessRole. Null skips both roles (use null for the management account itself)."
+  description = "Organization management account ID, trusted by the roles enabled with create_controltower_execution_role and create_organization_access_role. Leave null for the management account itself."
+}
+
+variable "create_controltower_execution_role" {
+  type        = bool
+  default     = false
+  description = "Create AWSControlTowerExecution (AdministratorAccess, trusting management_account_id), which Control Tower needs to enroll an existing account. Requires management_account_id."
+
+  validation {
+    condition     = !var.create_controltower_execution_role || var.management_account_id != null
+    error_message = "create_controltower_execution_role needs management_account_id."
+  }
 }
 
 variable "create_organization_access_role" {
   type        = bool
   default     = false
   description = "Create OrganizationAccountAccessRole, trusting management_account_id. Needed for accounts invited into the organization (Organizations only creates it for accounts it creates). Requires management_account_id."
+
+  validation {
+    condition     = !var.create_organization_access_role || var.management_account_id != null
+    error_message = "create_organization_access_role needs management_account_id."
+  }
 }
 
 variable "organization_access_extra_trusted_account_ids" {

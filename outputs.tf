@@ -1,11 +1,11 @@
 output "role_arns" {
-  value       = module.oidc.iam_role_arns_map
-  description = "Map of GitHub OIDC role name to ARN (main, plan and additional roles)."
+  value       = try(module.oidc[0].iam_role_arns_map, {})
+  description = "Map of CI role name to ARN (apply, plan and additional roles); empty when github is null."
 }
 
 output "oidc_provider_arn" {
-  value       = module.oidc.github_oidc_provider_arn
-  description = "ARN of the GitHub Actions OIDC provider in this account."
+  value       = try(module.oidc[0].github_oidc_provider_arn, null)
+  description = "ARN of the GitHub Actions OIDC provider in this account, or null when github is null."
 }
 
 output "state_bucket_name" {

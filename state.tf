@@ -1,3 +1,12 @@
+locals {
+  state_lifecycle_rules = var.state_noncurrent_version_days == null ? [] : [{
+    id                            = "expire-noncurrent-state"
+    enabled                       = true
+    filter                        = {} # whole bucket
+    noncurrent_version_expiration = { days = var.state_noncurrent_version_days }
+  }]
+}
+
 module "state_bucket" {
   count   = var.state_bucket_name == null ? 0 : 1
   source  = "terraform-aws-modules/s3-bucket/aws"
@@ -9,6 +18,7 @@ module "state_bucket" {
   versioning = {
     enabled = true
   }
+  lifecycle_rule = local.state_lifecycle_rules
 
   attach_deny_insecure_transport_policy = true
   attach_require_latest_tls_policy      = true

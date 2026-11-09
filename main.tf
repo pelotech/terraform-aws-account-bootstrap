@@ -1,6 +1,7 @@
-# Baseline for one AWS account: GitHub OIDC provider with CI roles, a
-# tfstate bucket, and the Control Tower execution role. The caller passes the
-# provider for the target account.
+# What one AWS account needs before CI can manage it: CI access (GitHub OIDC
+# provider plus apply and plan roles), a tfstate bucket, and the roles the
+# organization management account uses to reach it. Every part is optional.
+# The caller passes the provider for the target account.
 
 data "aws_partition" "current" {}
 
@@ -21,12 +22,12 @@ locals {
 
   base_roles = {
     (var.apply_role_name) = {
-      subject_repos     = ["repo:${var.github_repository}:ref:refs/heads/${var.main_branch}"]
+      subject_repos     = [for s in try(var.github.apply_subjects, []) : "repo:${var.github.repository}:${s}"]
       policy_arns       = ["arn:${local.partition}:iam::aws:policy/AdministratorAccess"]
       assume_role_names = sort(local.sso_admin_role_names)
     }
     (var.plan_role_name) = {
-      subject_repos     = ["repo:${var.github_repository}:*"]
+      subject_repos     = [for s in try(var.github.plan_subjects, []) : "repo:${var.github.repository}:${s}"]
       policy_arns       = concat(["arn:${local.partition}:iam::aws:policy/ReadOnlyAccess"], var.plan_policy_arns)
       assume_role_names = null
     }
@@ -34,9 +35,16 @@ locals {
 }
 
 module "oidc" {
+  count   = var.github == null ? 0 : 1
   source  = "pelotech/oidc-github/aws"
   version = "1.2.1"
 
   roles = merge(local.base_roles, var.additional_roles)
   tags  = var.tags
+}
+
+# module.oidc gained a count when CI access became optional.
+moved {
+  from = module.oidc
+  to   = module.oidc[0]
 }
