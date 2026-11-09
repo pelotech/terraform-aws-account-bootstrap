@@ -1,108 +1,88 @@
 variable "github" {
   type = object({
-    repository     = string
-    apply_subjects = list(string)
-    plan_subjects  = list(string)
+    repository                = string
+    apply_subjects            = list(string)
+    plan_subjects             = list(string)
+    apply_role_name           = optional(string, "ci-apply")
+    plan_role_name            = optional(string, "ci-plan")
+    plan_policy_arns          = optional(list(string), [])
+    sso_admin_permission_sets = optional(list(string), [])
   })
   default     = null
-  description = "GitHub Actions access to this account: an OIDC provider plus the apply and plan roles. repository: owner/name. apply_subjects / plan_subjects: the OIDC subject claims each role trusts, without the repo:<repository>: prefix, e.g. [\"ref:refs/heads/main\"], [\"pull_request\"], [\"environment:prod\"] or [\"*\"]. Null creates no OIDC provider or CI roles."
+  description = <<-EOT
+    GitHub Actions access to this account: an OIDC provider plus an apply role (AdministratorAccess) and a plan role (ReadOnlyAccess). Null creates none of them.
+      - repository: owner/name.
+      - apply_subjects / plan_subjects: OIDC subject claims each role trusts, without the repo:<repository>: prefix, e.g. ["environment:prod"], ["ref:refs/heads/main"], ["pull_request"].
+      - apply_role_name / plan_role_name: role names (default ci-apply / ci-plan).
+      - plan_policy_arns: extra policy ARNs for the plan role.
+      - sso_admin_permission_sets: Identity Center permission sets (e.g. ["AdministratorAccess"]) whose roles in this account may assume the apply role, to reach what only the apply role can (EKS cluster-creator admin, KMS keys it administers).
+  EOT
+
+  validation {
+    condition     = var.github == null || try(can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github.repository)), false)
+    error_message = "github.repository must be owner/name."
+  }
 
   validation {
     condition     = var.github == null || try(length(var.github.apply_subjects) > 0 && length(var.github.plan_subjects) > 0, false)
     error_message = "github.apply_subjects and github.plan_subjects must each list at least one subject."
   }
-}
-
-variable "apply_role_name" {
-  type        = string
-  default     = "ci-apply"
-  description = "Name of the admin role CI assumes to apply, trusted for github.apply_subjects."
-}
-
-variable "plan_role_name" {
-  type        = string
-  default     = "ci-plan"
-  description = "Name of the read-only role CI assumes to plan, trusted for github.plan_subjects."
-}
-
-variable "sso_admin_permission_sets" {
-  type        = list(string)
-  default     = []
-  description = "IAM Identity Center permission sets (e.g. [\"AdministratorAccess\"]) whose roles in this account may also assume the apply role, to debug with CI's exact permissions."
-}
-
-variable "plan_policy_arns" {
-  type        = list(string)
-  default     = []
-  description = "Extra policy ARNs for the plan role, on top of ReadOnlyAccess."
-}
-
-variable "additional_roles" {
-  type = map(object({
-    subject_repos        = list(string)
-    policy_arns          = list(string)
-    role_path            = optional(string, "/")
-    assume_role_names    = optional(list(string))
-    max_session_duration = optional(number)
-    inline_policies      = optional(map(string), {})
-  }))
-  default     = {}
-  description = "Extra GitHub OIDC roles to create next to the apply and plan roles, keyed by role name. Same shape as pelotech/oidc-github's roles input."
-}
-
-variable "state_bucket_name" {
-  type        = string
-  default     = null
-  description = "Name of the S3 bucket for this account's OpenTofu state. Null skips the bucket."
-}
-
-variable "state_noncurrent_version_days" {
-  type        = number
-  default     = null
-  description = "Expire noncurrent (old) state object versions after this many days. Null keeps every version."
 
   validation {
-    condition     = var.state_noncurrent_version_days == null || try(var.state_noncurrent_version_days >= 1, false)
-    error_message = "state_noncurrent_version_days must be at least 1."
+    condition     = var.github == null || try(var.github.apply_role_name != var.github.plan_role_name, false)
+    error_message = "github.apply_role_name and github.plan_role_name must differ."
   }
 }
 
-variable "management_account_id" {
-  type        = string
+variable "state_bucket" {
+  type = object({
+    name                    = string
+    noncurrent_version_days = optional(number)
+  })
   default     = null
-  description = "Organization management account ID, trusted by the roles enabled with create_controltower_execution_role and create_organization_access_role. Leave null for the management account itself."
-}
-
-variable "create_controltower_execution_role" {
-  type        = bool
-  default     = false
-  description = "Create AWSControlTowerExecution (AdministratorAccess, trusting management_account_id), which Control Tower needs to enroll an existing account. Requires management_account_id."
+  description = <<-EOT
+    S3 bucket for this account's Terraform state. Null creates no bucket.
+      - name: bucket name.
+      - noncurrent_version_days: expire old state versions after this many days. Null keeps every version.
+  EOT
 
   validation {
-    condition     = !var.create_controltower_execution_role || var.management_account_id != null
-    error_message = "create_controltower_execution_role needs management_account_id."
+    condition     = try(var.state_bucket.noncurrent_version_days == null || var.state_bucket.noncurrent_version_days >= 1, true)
+    error_message = "state_bucket.noncurrent_version_days must be at least 1."
   }
 }
 
-variable "create_organization_access_role" {
-  type        = bool
-  default     = false
-  description = "Create OrganizationAccountAccessRole, trusting management_account_id. Needed for accounts invited into the organization (Organizations only creates it for accounts it creates). Requires management_account_id."
+variable "management_account" {
+  type = object({
+    id                                 = string
+    create_organization_access_role    = optional(bool, false)
+    create_controltower_execution_role = optional(bool, false)
+    previous_management_account_ids    = optional(list(string), [])
+  })
+  default     = null
+  description = <<-EOT
+    Roles the organization management account uses to reach this account, each AdministratorAccess and trusting only the management account. Null (e.g. in the management account itself) creates none.
+      - id: management account ID.
+      - create_organization_access_role: OrganizationAccountAccessRole. Organizations creates it only for accounts it creates, so set this for accounts invited into the organization.
+      - create_controltower_execution_role: AWSControlTowerExecution, which Control Tower needs to enroll an existing account.
+      - previous_management_account_ids: also trusted by OrganizationAccountAccessRole while migrating an account transferred from another organization; set back to [] at cutover.
+  EOT
 
   validation {
-    condition     = !var.create_organization_access_role || var.management_account_id != null
-    error_message = "create_organization_access_role needs management_account_id."
+    condition = var.management_account == null || try(alltrue([
+      for id in concat([var.management_account.id], var.management_account.previous_management_account_ids) : can(regex("^[0-9]{12}$", id))
+    ]), false)
+    error_message = "management_account.id and previous_management_account_ids must be 12-digit AWS account IDs."
   }
-}
-
-variable "organization_access_extra_trusted_account_ids" {
-  type        = list(string)
-  default     = []
-  description = "Extra account IDs (e.g. the previous organization's management account) that OrganizationAccountAccessRole also trusts. Transitional: use only while migrating an account transferred from another organization, then set back to []."
 
   validation {
-    condition     = alltrue([for id in var.organization_access_extra_trusted_account_ids : can(regex("^[0-9]{12}$", id))])
-    error_message = "organization_access_extra_trusted_account_ids must be 12-digit AWS account IDs."
+    condition     = var.management_account == null || try(var.management_account.create_organization_access_role || var.management_account.create_controltower_execution_role, false)
+    error_message = "management_account creates nothing: set create_organization_access_role and/or create_controltower_execution_role, or leave management_account null."
+  }
+
+  validation {
+    condition     = var.management_account == null || try(length(var.management_account.previous_management_account_ids) == 0 || var.management_account.create_organization_access_role, false)
+    error_message = "management_account.previous_management_account_ids needs create_organization_access_role."
   }
 }
 
