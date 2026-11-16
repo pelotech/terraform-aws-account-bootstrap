@@ -29,6 +29,13 @@ resource "aws_cloudwatch_event_rule" "risk_alerts" {
     }
   })
   tags = var.tags
+
+  lifecycle {
+    precondition {
+      condition     = local.partition != "aws-us-gov" || length(local.risk_alerts_webhooks) == 0
+      error_message = "risk_alerts.webhook_urls isn't supported in GovCloud, which has no EventBridge API destinations. Leave it empty and subscribe a forwarder (for example terraform-aws-modules/notify-slack) to the risk_alerts_topic_arn output; see the README."
+    }
+  }
 }
 
 # No server-side encryption: EventBridge can't publish through the AWS managed

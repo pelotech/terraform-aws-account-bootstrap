@@ -101,7 +101,7 @@ variable "risk_alerts" {
   description = <<-EOT
     Send AWS Health RISK events (for example exposed access keys) to the incident channel. Null creates nothing. Set it in the organization's AWS Health delegated administrator or management account to cover every account in the organization; anywhere else it covers this account only.
       - email_endpoints: addresses to notify. Each must confirm the subscription AWS emails it.
-      - webhook_urls: name => incoming webhook URL of a Slack channel or Google Chat space. The URLs are secrets and are stored in state; pass them from sensitive variables.
+      - webhook_urls: name => incoming webhook URL of a Slack channel or Google Chat space. The URLs are secrets and are stored in state; pass them from sensitive variables. Not supported in GovCloud (no EventBridge API destinations); subscribe a forwarder to risk_alerts_topic_arn there instead.
   EOT
 
   validation {
