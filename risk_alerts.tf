@@ -36,7 +36,7 @@ resource "aws_cloudwatch_event_rule" "risk_alerts" {
 module "risk_alerts_topic" {
   count   = var.risk_alerts == null ? 0 : 1
   source  = "terraform-aws-modules/sns/aws"
-  version = "7.1.0"
+  version = "7.2.0"
 
   region = local.risk_alerts_region
   name   = local.risk_alerts_name
