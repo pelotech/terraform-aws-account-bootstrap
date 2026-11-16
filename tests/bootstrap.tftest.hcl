@@ -487,6 +487,14 @@ run "risk_alerts_commercial_region" {
 run "risk_alerts_webhooks" {
   command = plan
 
+  # API destinations exist in commercial only.
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition = "aws"
+    }
+  }
+
   variables {
     risk_alerts = {
       webhook_urls = {
@@ -529,4 +537,18 @@ run "risk_alerts_webhook_urls_must_be_https" {
   }
 
   expect_failures = [var.risk_alerts]
+}
+
+run "risk_alerts_webhook_urls_rejected_in_govcloud" {
+  command = plan
+
+  variables {
+    risk_alerts = {
+      webhook_urls = {
+        slack = sensitive("https://hooks.slack.com/services/T000/B000/XXXX")
+      }
+    }
+  }
+
+  expect_failures = [aws_cloudwatch_event_rule.risk_alerts]
 }
