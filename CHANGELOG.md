@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/pelotech/terraform-aws-account-bootstrap/compare/v0.3.0...v0.3.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* reject risk_alerts webhook_urls in govcloud at plan time ([#17](https://github.com/pelotech/terraform-aws-account-bootstrap/issues/17)) ([0a6ab14](https://github.com/pelotech/terraform-aws-account-bootstrap/commit/0a6ab14fdb31bf3e21c2551e01b7dcdab7b4839d))
+
 ## [0.3.0](https://github.com/pelotech/terraform-aws-account-bootstrap/compare/v0.2.0...v0.3.0) (2026-11-16)
 
 
