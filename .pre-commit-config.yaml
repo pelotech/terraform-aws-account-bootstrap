@@ -39,10 +39,10 @@ repos:
         files: \.(tf|tftest\.hcl)$
         pass_filenames: false
   - repo: https://github.com/kjanat/actionlint
-    rev: v1.17.0
+    rev: v1.17.1
     hooks:
       - id: actionlint
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.31.1
+    rev: v1.32.0
     hooks:
       - id: zizmor
