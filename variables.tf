@@ -94,18 +94,20 @@ variable "tags" {
 
 variable "risk_alerts" {
   type = object({
-    sns_topic_arn = string
-    name          = optional(string, "health-risk-alerts")
+    email_endpoints = optional(list(string), [])
+    webhook_urls    = optional(map(string), {})
   })
   default     = null
   description = <<-EOT
-    Forward AWS Health RISK events (for example exposed access keys) from this account to an incident SNS topic. Null creates nothing.
-      - sns_topic_arn: the topic to publish to, usually a shared one in another account (see modules/risk-alert-topic). It must be in us-east-1, or us-gov-west-1 in GovCloud, where AWS Health sends these events. The topic's policy must let this account's role publish.
-      - name: name of the EventBridge rule and the IAM role it uses (default health-risk-alerts).
+    Send AWS Health RISK events (for example exposed access keys) to the incident channel. Null creates nothing. Set it in the organization's AWS Health delegated administrator or management account to cover every account in the organization; anywhere else it covers this account only.
+      - email_endpoints: addresses to notify. Each must confirm the subscription AWS emails it.
+      - webhook_urls: name => incoming webhook URL of a Slack channel or Google Chat space. The URLs are secrets and are stored in state; pass them from sensitive variables.
   EOT
 
   validation {
-    condition     = var.risk_alerts == null || try(can(regex("^arn:aws(-us-gov)?:sns:(us-east-1|us-gov-west-1):[0-9]{12}:[A-Za-z0-9_-]+$", var.risk_alerts.sns_topic_arn)), false)
-    error_message = "risk_alerts.sns_topic_arn must be an SNS topic ARN in us-east-1 (or us-gov-west-1 in GovCloud)."
+    condition = var.risk_alerts == null || try(alltrue([
+      for name, url in var.risk_alerts.webhook_urls : can(regex("^[A-Za-z0-9_-]+$", name)) && startswith(url, "https://")
+    ]), false)
+    error_message = "risk_alerts.webhook_urls names may use letters, digits, - and _, and each URL must start with https://."
   }
 }

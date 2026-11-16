@@ -13,10 +13,25 @@ mock_provider "aws" {
       json = "{}"
     }
   }
-  # The risk-alerts event target validates its role ARN.
+  # The risk-alerts event targets validate their ARNs.
   mock_resource "aws_iam_role" {
     defaults = {
       arn = "arn:aws:iam::222222222222:role/mock"
+    }
+  }
+  mock_resource "aws_cloudwatch_event_connection" {
+    defaults = {
+      arn = "arn:aws:events:us-east-1:222222222222:connection/mock/11111111-1111-1111-1111-111111111111"
+    }
+  }
+  mock_resource "aws_cloudwatch_event_api_destination" {
+    defaults = {
+      arn = "arn:aws:events:us-east-1:222222222222:api-destination/mock/11111111-1111-1111-1111-111111111111"
+    }
+  }
+  mock_resource "aws_sns_topic" {
+    defaults = {
+      arn = "arn:aws:sns:us-east-1:222222222222:health-risk-alerts"
     }
   }
   mock_data "aws_iam_roles" {
@@ -411,47 +426,105 @@ run "risk_alerts_off_by_default" {
   command = plan
 
   assert {
-    condition     = length(aws_cloudwatch_event_rule.health_risk) == 0 && length(aws_iam_role.health_risk) == 0
-    error_message = "risk_alerts null should create no rule or role"
+    condition     = length(aws_cloudwatch_event_rule.risk_alerts) == 0 && length(module.risk_alerts_topic) == 0
+    error_message = "risk_alerts null should create no rule or topic"
   }
 }
 
-run "risk_alerts_forward_to_topic" {
+run "risk_alerts_rule_and_topic" {
   command = plan
 
   variables {
     risk_alerts = {
-      sns_topic_arn = "arn:aws:sns:us-east-1:111111111111:health-risk-alerts"
+      email_endpoints = ["incidents@example.com"]
     }
   }
 
+  # The mocked partition is aws-us-gov.
   assert {
-    condition     = aws_cloudwatch_event_rule.health_risk[0].region == "us-east-1" && aws_cloudwatch_event_target.health_risk[0].region == "us-east-1"
-    error_message = "rule and target should be in the topic's region"
+    condition     = aws_cloudwatch_event_rule.risk_alerts[0].region == "us-gov-west-1" && aws_cloudwatch_event_target.risk_alerts_topic[0].region == "us-gov-west-1"
+    error_message = "GovCloud rule and target should be in us-gov-west-1, where AWS Health sends these events"
   }
 
   assert {
-    condition     = jsondecode(aws_cloudwatch_event_rule.health_risk[0].event_pattern).detail.service == ["RISK"]
+    condition     = jsondecode(aws_cloudwatch_event_rule.risk_alerts[0].event_pattern).detail.service == ["RISK"]
     error_message = "rule should match AWS Health RISK events"
   }
 
   assert {
-    condition     = aws_cloudwatch_event_target.health_risk[0].arn == "arn:aws:sns:us-east-1:111111111111:health-risk-alerts"
-    error_message = "target should be the incident topic"
+    condition     = keys(module.risk_alerts_topic[0].subscriptions) == ["incidents@example.com"]
+    error_message = "one email subscription per endpoint"
   }
 
   assert {
-    condition     = aws_iam_role.health_risk[0].name == "health-risk-alerts" && aws_cloudwatch_event_rule.health_risk[0].name == "health-risk-alerts"
-    error_message = "rule and role should default to health-risk-alerts"
+    condition     = length(aws_cloudwatch_event_connection.risk_alerts_webhook) == 0 && length(aws_iam_role.risk_alerts_webhook) == 0 && length(aws_cloudwatch_event_target.risk_alerts_webhook) == 0
+    error_message = "no webhook_urls should create no connection, role or webhook target"
   }
 }
 
-run "risk_alerts_topic_must_be_in_health_region" {
+run "risk_alerts_commercial_region" {
+  command = plan
+
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition = "aws"
+    }
+  }
+
+  variables {
+    risk_alerts = {
+      email_endpoints = []
+    }
+  }
+
+  assert {
+    condition     = aws_cloudwatch_event_rule.risk_alerts[0].region == "us-east-1"
+    error_message = "commercial rule should be in us-east-1"
+  }
+}
+
+run "risk_alerts_webhooks" {
   command = plan
 
   variables {
     risk_alerts = {
-      sns_topic_arn = "arn:aws:sns:us-west-2:111111111111:health-risk-alerts"
+      webhook_urls = {
+        secops-chat  = sensitive("https://chat.googleapis.com/v1/spaces/AAAA/messages?key=k&token=t")
+        secops-slack = sensitive("https://hooks.slack.com/services/T000/B000/XXXX")
+      }
+    }
+  }
+
+  assert {
+    condition     = keys(aws_cloudwatch_event_api_destination.risk_alerts_webhook) == ["secops-chat", "secops-slack"]
+    error_message = "one API destination per webhook"
+  }
+
+  assert {
+    condition     = aws_cloudwatch_event_api_destination.risk_alerts_webhook["secops-slack"].name == "health-risk-alerts-secops-slack" && aws_cloudwatch_event_api_destination.risk_alerts_webhook["secops-slack"].http_method == "POST"
+    error_message = "API destination should POST and be named after the webhook"
+  }
+
+  assert {
+    condition     = length(aws_cloudwatch_event_connection.risk_alerts_webhook) == 1 && length(aws_iam_role.risk_alerts_webhook) == 1
+    error_message = "webhooks share one connection and one role"
+  }
+
+  assert {
+    condition     = strcontains(jsondecode(aws_cloudwatch_event_target.risk_alerts_webhook["secops-chat"].input_transformer[0].input_template).text, "<type>")
+    error_message = "webhook body should be JSON with a text field holding unescaped placeholders"
+  }
+}
+
+run "risk_alerts_webhook_urls_must_be_https" {
+  command = plan
+
+  variables {
+    risk_alerts = {
+      webhook_urls = {
+        chat = "http://example.com/hook"
+      }
     }
   }
 
