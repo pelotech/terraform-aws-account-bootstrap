@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/pelotech/terraform-aws-account-bootstrap/compare/v0.2.0...v0.3.0) (2026-11-16)
+
+
+### Features
+
+* optional AWS Health RISK alerts by email and chat webhook ([#15](https://github.com/pelotech/terraform-aws-account-bootstrap/issues/15)) ([17e87a0](https://github.com/pelotech/terraform-aws-account-bootstrap/commit/17e87a0c952dedcf736c0993fac61355fd180363))
+
+
+### Chores
+
+* **deps:** update lint tooling ([#13](https://github.com/pelotech/terraform-aws-account-bootstrap/issues/13)) ([03c5fb9](https://github.com/pelotech/terraform-aws-account-bootstrap/commit/03c5fb9ca2fdaa9e0be3932fb19f2bdf6b6adaa7))
+
 ## [0.2.0](https://github.com/pelotech/terraform-aws-account-bootstrap/compare/v0.1.1...v0.2.0) (2026-11-09)
 
 
