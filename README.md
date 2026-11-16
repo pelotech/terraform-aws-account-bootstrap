@@ -9,6 +9,7 @@ Every part is optional. Set an input to turn that part on; leave it `null` to sk
 | `github` | A GitHub Actions OIDC provider, plus an **apply** role (`AdministratorAccess`) and a **plan** role (`ReadOnlyAccess`). Built with [`pelotech/oidc-github`](https://registry.terraform.io/modules/pelotech/oidc-github/aws). |
 | `state_bucket` | An S3 bucket for Terraform state: versioned, AES256-encrypted, TLS-only, with public access blocked. |
 | `management_account` | `OrganizationAccountAccessRole` and/or `AWSControlTowerExecution`. Both are `AdministratorAccess` and trust only the organization management account. |
+| `risk_alerts` | An EventBridge rule that forwards AWS Health RISK events, such as exposed access keys, to an incident SNS topic, plus the role it publishes with. |
 
 The module manages one account, declares no provider blocks and is partition-aware, so the same code works in commercial and GovCloud.
 
@@ -129,6 +130,39 @@ If you do want plans to lock, pass a policy through `github.plan_policy_arns` th
 
 **Protect these roles in your own root.** They are how the management account reaches the account, and the module doesn't add `prevent_destroy`. Also note: removing the module call detaches `AdministratorAccess` from these roles. If your provider assumes one of them, remove the account's other resources first, or use the account's own admin credentials.
 
+## Exposed-key and other risk alerts (`risk_alerts`)
+
+AWS Health raises a RISK event when it finds a problem such as an access key exposed in a public repository. Setting `risk_alerts` forwards every RISK event from the account to an SNS topic, which usually lives in a security account and notifies the incident channel.
+
+Create the topic once per incident channel with [`modules/risk-alert-topic`](modules/risk-alert-topic), listing every account that publishes to it. For managed customer accounts, give each customer its own topic so its alerts reach its own channel.
+
+```hcl
+module "risk_alert_topic" {
+  source = "git::https://github.com/pelotech/terraform-aws-account-bootstrap.git//modules/risk-alert-topic?ref=vX.Y.Z"
+  providers = {
+    aws = aws.secops
+  }
+
+  publisher_account_ids = ["111111111111", "222222222222"]
+  email_endpoints       = ["incidents@example.com"] # e.g. a Slack channel's email address
+}
+
+module "workloads" {
+  source = "git::https://github.com/pelotech/terraform-aws-account-bootstrap.git?ref=vX.Y.Z"
+  providers = {
+    aws = aws.workloads
+  }
+
+  risk_alerts = {
+    sns_topic_arn = module.risk_alert_topic.topic_arn
+  }
+}
+```
+
+- The topic must be in `us-east-1` (`us-gov-west-1` in GovCloud), where AWS Health sends these events. The rule is created in the topic's region, so the account's provider can use any region.
+- Each email endpoint has to confirm the subscription from the email AWS sends before alerts arrive.
+- AWS Health events can't be triggered on demand. To show the path works, publish a test message to the topic, or send a sample `aws.health` event through the rule.
+
 ## Tests
 
 The tests run offline with a mocked provider. The nix dev shell runs Terraform through tenv, which installs the `required_version` floor (`.terraform-version` is `min-required`).
@@ -165,8 +199,15 @@ terraform test
 
 | Name | Type |
 | ---- | ---- |
+| [aws_cloudwatch_event_rule.health_risk](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_event_rule) | resource |
+| [aws_cloudwatch_event_target.health_risk](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_event_target) | resource |
+| [aws_iam_role.health_risk](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role.management](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
+| [aws_iam_role_policy.health_risk](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_iam_role_policy_attachment.management](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
+| [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
+| [aws_iam_policy_document.health_risk_publish](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
+| [aws_iam_policy_document.health_risk_trust](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_roles.sso](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_roles) | data source |
 | [aws_partition.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/partition) | data source |
 
@@ -176,6 +217,7 @@ terraform test
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_github"></a> [github](#input\_github) | GitHub Actions access to this account: an OIDC provider plus an apply role (AdministratorAccess) and a plan role (ReadOnlyAccess). Null creates none of them.<br/>  - repository: owner/name, as it appears in the OIDC sub claim. If the organization or repository customizes the sub claim to include IDs, use owner@owner\_id/name@repo\_id.<br/>  - apply\_subjects / plan\_subjects: OIDC subject claims each role trusts, without the repo:<repository>: prefix, e.g. ["environment:prod"], ["ref:refs/heads/main"], ["pull\_request"].<br/>  - apply\_role\_name / plan\_role\_name: role names (default ci-apply / ci-plan).<br/>  - plan\_policy\_arns: extra policy ARNs for the plan role.<br/>  - sso\_admin\_permission\_sets: Identity Center permission sets (e.g. ["AdministratorAccess"]) whose roles in this account may assume the apply role, to reach what only the apply role can (EKS cluster-creator admin, KMS keys it administers). | <pre>object({<br/>    repository                = string<br/>    apply_subjects            = list(string)<br/>    plan_subjects             = list(string)<br/>    apply_role_name           = optional(string, "ci-apply")<br/>    plan_role_name            = optional(string, "ci-plan")<br/>    plan_policy_arns          = optional(list(string), [])<br/>    sso_admin_permission_sets = optional(list(string), [])<br/>  })</pre> | `null` | no |
 | <a name="input_management_account"></a> [management\_account](#input\_management\_account) | Roles the organization management account uses to reach this account, each AdministratorAccess and trusting only the management account. Null (e.g. in the management account itself) creates none.<br/>  - id: management account ID.<br/>  - create\_organization\_access\_role: OrganizationAccountAccessRole. Organizations creates it only for accounts it creates, so set this for accounts invited into the organization.<br/>  - create\_controltower\_execution\_role: AWSControlTowerExecution, which Control Tower needs to enroll an existing account.<br/>  - previous\_management\_account\_ids: also trusted by OrganizationAccountAccessRole while migrating an account transferred from another organization; set back to [] at cutover. | <pre>object({<br/>    id                                 = string<br/>    create_organization_access_role    = optional(bool, false)<br/>    create_controltower_execution_role = optional(bool, false)<br/>    previous_management_account_ids    = optional(list(string), [])<br/>  })</pre> | `null` | no |
+| <a name="input_risk_alerts"></a> [risk\_alerts](#input\_risk\_alerts) | Forward AWS Health RISK events (for example exposed access keys) from this account to an incident SNS topic. Null creates nothing.<br/>  - sns\_topic\_arn: the topic to publish to, usually a shared one in another account (see modules/risk-alert-topic). It must be in us-east-1, or us-gov-west-1 in GovCloud, where AWS Health sends these events. The topic's policy must let this account's role publish.<br/>  - name: name of the EventBridge rule and the IAM role it uses (default health-risk-alerts). | <pre>object({<br/>    sns_topic_arn = string<br/>    name          = optional(string, "health-risk-alerts")<br/>  })</pre> | `null` | no |
 | <a name="input_state_bucket"></a> [state\_bucket](#input\_state\_bucket) | S3 bucket for this account's Terraform state. Null creates no bucket.<br/>  - name: bucket name.<br/>  - noncurrent\_version\_days: expire old state versions after this many days. Null keeps every version. | <pre>object({<br/>    name                    = string<br/>    noncurrent_version_days = optional(number)<br/>  })</pre> | `null` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags applied to the resources this module creates. | `map(string)` | `{}` | no |
 
@@ -188,5 +230,6 @@ terraform test
 | <a name="output_oidc_provider_arn"></a> [oidc\_provider\_arn](#output\_oidc\_provider\_arn) | ARN of the GitHub Actions OIDC provider in this account, or null when github is null. |
 | <a name="output_organization_access_role_arn"></a> [organization\_access\_role\_arn](#output\_organization\_access\_role\_arn) | ARN of OrganizationAccountAccessRole, or null when it was not created. |
 | <a name="output_plan_role_arn"></a> [plan\_role\_arn](#output\_plan\_role\_arn) | ARN of the CI plan role (role-to-assume for plan workflows), or null when github is null. |
+| <a name="output_risk_alerts_role_arn"></a> [risk\_alerts\_role\_arn](#output\_risk\_alerts\_role\_arn) | ARN of the role EventBridge uses to publish AWS Health RISK events to the incident topic, or null when risk\_alerts is null. |
 | <a name="output_state_bucket_name"></a> [state\_bucket\_name](#output\_state\_bucket\_name) | Name of the Terraform state bucket, or null when state\_bucket is null. |
 <!-- END_TF_DOCS -->

@@ -13,6 +13,12 @@ mock_provider "aws" {
       json = "{}"
     }
   }
+  # The risk-alerts event target validates its role ARN.
+  mock_resource "aws_iam_role" {
+    defaults = {
+      arn = "arn:aws:iam::222222222222:role/mock"
+    }
+  }
   mock_data "aws_iam_roles" {
     defaults = {
       arns = [
@@ -395,4 +401,59 @@ run "previous_management_ids_need_organization_access_role" {
   }
 
   expect_failures = [var.management_account]
+}
+
+################################################################################
+# AWS Health RISK alerts
+################################################################################
+
+run "risk_alerts_off_by_default" {
+  command = plan
+
+  assert {
+    condition     = length(aws_cloudwatch_event_rule.health_risk) == 0 && length(aws_iam_role.health_risk) == 0
+    error_message = "risk_alerts null should create no rule or role"
+  }
+}
+
+run "risk_alerts_forward_to_topic" {
+  command = plan
+
+  variables {
+    risk_alerts = {
+      sns_topic_arn = "arn:aws:sns:us-east-1:111111111111:health-risk-alerts"
+    }
+  }
+
+  assert {
+    condition     = aws_cloudwatch_event_rule.health_risk[0].region == "us-east-1" && aws_cloudwatch_event_target.health_risk[0].region == "us-east-1"
+    error_message = "rule and target should be in the topic's region"
+  }
+
+  assert {
+    condition     = jsondecode(aws_cloudwatch_event_rule.health_risk[0].event_pattern).detail.service == ["RISK"]
+    error_message = "rule should match AWS Health RISK events"
+  }
+
+  assert {
+    condition     = aws_cloudwatch_event_target.health_risk[0].arn == "arn:aws:sns:us-east-1:111111111111:health-risk-alerts"
+    error_message = "target should be the incident topic"
+  }
+
+  assert {
+    condition     = aws_iam_role.health_risk[0].name == "health-risk-alerts" && aws_cloudwatch_event_rule.health_risk[0].name == "health-risk-alerts"
+    error_message = "rule and role should default to health-risk-alerts"
+  }
+}
+
+run "risk_alerts_topic_must_be_in_health_region" {
+  command = plan
+
+  variables {
+    risk_alerts = {
+      sns_topic_arn = "arn:aws:sns:us-west-2:111111111111:health-risk-alerts"
+    }
+  }
+
+  expect_failures = [var.risk_alerts]
 }

@@ -91,3 +91,21 @@ variable "tags" {
   default     = {}
   description = "Tags applied to the resources this module creates."
 }
+
+variable "risk_alerts" {
+  type = object({
+    sns_topic_arn = string
+    name          = optional(string, "health-risk-alerts")
+  })
+  default     = null
+  description = <<-EOT
+    Forward AWS Health RISK events (for example exposed access keys) from this account to an incident SNS topic. Null creates nothing.
+      - sns_topic_arn: the topic to publish to, usually a shared one in another account (see modules/risk-alert-topic). It must be in us-east-1, or us-gov-west-1 in GovCloud, where AWS Health sends these events. The topic's policy must let this account's role publish.
+      - name: name of the EventBridge rule and the IAM role it uses (default health-risk-alerts).
+  EOT
+
+  validation {
+    condition     = var.risk_alerts == null || try(can(regex("^arn:aws(-us-gov)?:sns:(us-east-1|us-gov-west-1):[0-9]{12}:[A-Za-z0-9_-]+$", var.risk_alerts.sns_topic_arn)), false)
+    error_message = "risk_alerts.sns_topic_arn must be an SNS topic ARN in us-east-1 (or us-gov-west-1 in GovCloud)."
+  }
+}

@@ -27,3 +27,8 @@ output "controltower_execution_role_arn" {
   value       = try(aws_iam_role.management["AWSControlTowerExecution"].arn, null)
   description = "ARN of AWSControlTowerExecution, or null when it was not created."
 }
+
+output "risk_alerts_role_arn" {
+  value       = try(aws_iam_role.health_risk[0].arn, null)
+  description = "ARN of the role EventBridge uses to publish AWS Health RISK events to the incident topic, or null when risk_alerts is null."
+}
