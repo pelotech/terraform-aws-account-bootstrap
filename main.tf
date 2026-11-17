@@ -1,7 +1,6 @@
 # What one AWS account needs before CI can manage it: CI access (GitHub OIDC
 # provider plus apply and plan roles), a Terraform state bucket, and the roles
-# the organization management account uses to reach it. It can also email
-# AWS Health RISK events to the incident channel. Every part is optional.
+# the organization management account uses to reach it. Every part is optional.
 # The caller passes the provider for the target account.
 
 data "aws_partition" "current" {}
