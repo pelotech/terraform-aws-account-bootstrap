@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/pelotech/terraform-aws-account-bootstrap/compare/v0.3.1...v0.3.2) (2026-11-17)
+
+
+### Refactors
+
+* move risk alerts to terraform-aws-organization ([#19](https://github.com/pelotech/terraform-aws-account-bootstrap/issues/19)) ([cf7c8c4](https://github.com/pelotech/terraform-aws-account-bootstrap/commit/cf7c8c40b6c502b69b2aed63ef592c6125e1012a))
+
 ## [0.3.1](https://github.com/pelotech/terraform-aws-account-bootstrap/compare/v0.3.0...v0.3.1) (2026-11-16)
 
 
