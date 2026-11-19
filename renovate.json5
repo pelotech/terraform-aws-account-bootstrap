@@ -16,5 +16,17 @@
       ],
       groupName: 'lint tooling',
     },
+    {
+      description: 'Group GitHub Actions minor and patch updates into one PR',
+      matchManagers: [
+        'github-actions',
+      ],
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+        'digest',
+      ],
+      groupName: 'github actions',
+    },
   ],
 }
