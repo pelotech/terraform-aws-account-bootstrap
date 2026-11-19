@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.3](https://github.com/pelotech/terraform-aws-account-bootstrap/compare/v0.3.2...v0.3.3) (2026-11-19)
+
+
+### Chores
+
+* **deps:** update pre-commit hook antonbabenko/pre-commit-terraform to v1.109.5 ([#21](https://github.com/pelotech/terraform-aws-account-bootstrap/issues/21)) ([b2c7277](https://github.com/pelotech/terraform-aws-account-bootstrap/commit/b2c72777023f6ba29560900befde6b8f30203391))
+* **renovate:** group github actions minor and patch updates into one pr ([#23](https://github.com/pelotech/terraform-aws-account-bootstrap/issues/23)) ([357339a](https://github.com/pelotech/terraform-aws-account-bootstrap/commit/357339aeb07d6b3bd26125508dd2a0533efa6e46))
+
 ## [0.3.2](https://github.com/pelotech/terraform-aws-account-bootstrap/compare/v0.3.1...v0.3.2) (2026-11-17)
 
 
